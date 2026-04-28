@@ -67,7 +67,7 @@ type WorkspacesResponse = {
   workspaces: WorkspaceSummary[];
 };
 
-type StudioNodeType = "referenceAudio" | "prompt" | "voiceClone" | "artifact";
+type StudioNodeType = "referenceAudio" | "voiceStyle" | "prompt" | "voiceClone" | "artifact";
 type StudioNode = Node<NodeData, StudioNodeType>;
 type StudioEdge = Edge;
 
@@ -118,10 +118,15 @@ const nodeCatalog: Record<
     description: "上传声音样本，输出给克隆节点",
     defaultData: () => ({ title: "参考音频", text: "声音样本" })
   },
+  voiceStyle: {
+    label: "语音风格",
+    description: "导演文本，控制声音情绪和表达",
+    defaultData: () => ({ title: "语音风格", text: "自然、清晰、略带播客讲述感，语速中等，语气友好但不过分夸张。" })
+  },
   prompt: {
     label: "提示词",
-    description: "导演文本或音频文本输入",
-    defaultData: () => ({ title: "提示词", text: "自然、清晰、略带播客讲述感，语速中等，语气友好但不过分夸张。" })
+    description: "要生成成音频的文本内容",
+    defaultData: () => ({ title: "提示词", text: "今天我们完成了铸光音频工作站的第一条生成链路，现在用这段声音检查相似度、节奏和情绪表现。" })
   },
   voiceClone: {
     label: "音频克隆",
@@ -210,6 +215,7 @@ function StudioApp() {
   const nodeTypes = useMemo<NodeTypes>(
     () => ({
       referenceAudio: ReferenceAudioNode,
+      voiceStyle: VoiceStyleNode,
       prompt: PromptNode,
       voiceClone: VoiceCloneNode,
       artifact: ArtifactNode
@@ -558,7 +564,22 @@ function PromptNode({ id, data }: NodeProps<StudioNode>) {
         value={data.text ?? ""}
         onChange={(event) => data.onPatch?.(id, { text: event.target.value })}
         rows={6}
-        placeholder="写入可连接到克隆节点的提示词、导演文本或音频文本。"
+        placeholder="写入最终要生成成音频的文本，并连接到克隆节点的「文本」输入。"
+      />
+    </StudioNodeFrame>
+  );
+}
+
+function VoiceStyleNode({ id, data }: NodeProps<StudioNode>) {
+  return (
+    <StudioNodeFrame id={id} data={data} icon={<Sparkles size={17} />} tone="style">
+      <Handle type="source" position={Position.Right} id="style" className="node-handle" />
+      <textarea
+        className="nodrag"
+        value={data.text ?? ""}
+        onChange={(event) => data.onPatch?.(id, { text: event.target.value })}
+        rows={6}
+        placeholder="写入语气、情绪、语速、角色和导演指令，并连接到克隆节点的「风格」输入。"
       />
     </StudioNodeFrame>
   );
@@ -573,11 +594,11 @@ function VoiceCloneNode({ id, data }: NodeProps<StudioNode>) {
       <Handle type="source" position={Position.Right} id="output" className="node-handle" />
       <div className="input-map">
         <span>参考</span>
-        <span>导演</span>
+        <span>风格</span>
         <span>文本</span>
       </div>
       <label className="node-field nodrag">
-        <span>导演文本</span>
+        <span>语音风格（导演文本）</span>
         <textarea value={data.instruction ?? ""} onChange={(event) => data.onPatch?.(id, { instruction: event.target.value })} rows={4} />
       </label>
       <label className="node-field nodrag">

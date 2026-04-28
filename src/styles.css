@@ -304,6 +304,13 @@ h1 {
   border-color: rgba(173, 188, 255, 0.5);
 }
 
+.node-style {
+  border-color: rgba(226, 194, 119, 0.62);
+  background:
+    linear-gradient(180deg, rgba(54, 42, 24, 0.96), rgba(15, 15, 13, 0.98)),
+    #11100e;
+}
+
 .node-clone {
   width: 370px;
   border-color: rgba(197, 164, 93, 0.75);
