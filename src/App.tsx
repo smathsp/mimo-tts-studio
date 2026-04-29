@@ -973,19 +973,61 @@ function BoardCreateDialog({
   const [script, setScript] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [progressText, setProgressText] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingChunksRef = useRef<BlobPart[]>([]);
   const recordingStreamRef = useRef<MediaStream | null>(null);
   const recordingTimerRef = useRef<number | null>(null);
+  const progressTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     return () => {
       stopRecordingTimer();
       stopRecordingStream();
+      if (progressTimerRef.current) {
+        window.clearTimeout(progressTimerRef.current);
+      }
     };
   }, []);
+
+  const progressStages = [
+    { percent: 15, text: "正在读取..." },
+    { percent: 35, text: "正在分析情感..." },
+    { percent: 55, text: "打个草稿..." },
+    { percent: 75, text: "画布创建中..." },
+    { percent: 90, text: "收个尾..." },
+    { percent: 95, text: "马上就好了..." }
+  ];
+
+  function startProgressSimulation() {
+    setProgress(0);
+    setProgressText("正在连接 AI 服务...");
+    let stageIndex = 0;
+
+    function advance() {
+      if (stageIndex < progressStages.length) {
+        const stage = progressStages[stageIndex];
+        setProgress(stage.percent);
+        setProgressText(stage.text);
+        stageIndex++;
+        const delay = 3000 + Math.random() * 2000;
+        progressTimerRef.current = window.setTimeout(advance, delay);
+      }
+    }
+
+    progressTimerRef.current = window.setTimeout(advance, 500);
+  }
+
+  function stopProgressSimulation(finalProgress: number) {
+    if (progressTimerRef.current) {
+      window.clearTimeout(progressTimerRef.current);
+      progressTimerRef.current = null;
+    }
+    setProgress(finalProgress);
+  }
 
   async function setSmartVoiceFile(file: File) {
     if (!allowedAudioTypes.has(file.type) && !/\.(mp3|m4a|mp4|wav)$/i.test(file.name)) {
@@ -1103,6 +1145,7 @@ function BoardCreateDialog({
 
     setIsGenerating(true);
     setError(null);
+    startProgressSimulation();
     try {
       const formData = new FormData();
       if (voiceFile) {
@@ -1111,8 +1154,12 @@ function BoardCreateDialog({
       formData.append("sceneDescription", sceneDescription.trim());
       formData.append("script", script.trim());
       await onCreateSmart(formData);
+      stopProgressSimulation(100);
+      setProgressText("我正在全速处理");
+      await new Promise((resolve) => setTimeout(resolve, 500));
       onClose();
     } catch (submitError) {
+      stopProgressSimulation(0);
       setError(submitError instanceof Error ? submitError.message : "智能画板生成失败。");
     } finally {
       setIsGenerating(false);
@@ -1178,6 +1225,14 @@ function BoardCreateDialog({
               />
             </label>
             {error ? <p className="node-error">{error}</p> : null}
+            {isGenerating && (
+              <div className="smart-progress">
+                <div className="smart-progress-bar">
+                  <div className="smart-progress-fill" style={{ width: `${progress}%` }} />
+                </div>
+                <p className="smart-progress-text">{progressText}</p>
+              </div>
+            )}
             <div className="modal-actions">
               <button type="button" onClick={() => onSwitchMode("choice")} disabled={isGenerating}>
                 返回
