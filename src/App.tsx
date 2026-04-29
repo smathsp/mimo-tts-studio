@@ -28,6 +28,7 @@ import {
   ChevronDown,
   Download,
   FileAudio,
+  Key,
   Loader2,
   Mic2,
   Pause,
@@ -37,7 +38,8 @@ import {
   Save,
   Sparkles,
   Square,
-  Trash2
+  Trash2,
+  X
 } from "lucide-react";
 import { ChangeEvent, MouseEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getBezierPath } from "@xyflow/react";
@@ -178,6 +180,8 @@ const nodeCatalog: Record<
 };
 
 const autoSaveDelayMs = 5000;
+const DEFAULT_API_KEY = "sk-cbpjuoes34akq38omkqz9s08s7h9dxwe7cjshz5824kskliz";
+const API_KEY_STORAGE_KEY = "mimo-api-key";
 
 const allowedAudioTypes = new Set(["audio/mpeg", "audio/mp3", "audio/mp4", "audio/m4a", "audio/wav", "audio/x-wav", "audio/wave", "video/mp4"]);
 const maxAudioBytes = Math.floor(7.5 * 1024 * 1024);
@@ -203,10 +207,16 @@ function StudioApp() {
   const [boardDialog, setBoardDialog] = useState<"choice" | "smart" | null>(null);
   const flowRef = useRef<ReactFlowInstance<StudioNode, StudioEdge> | null>(null);
   const saveTimerRef = useRef<number | null>(null);
+  const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem(API_KEY_STORAGE_KEY) || DEFAULT_API_KEY);
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState(apiKey);
 
   useEffect(() => {
     void loadStatus();
     void loadWorkspaceList();
+    if (!localStorage.getItem(API_KEY_STORAGE_KEY)) {
+      setShowApiKeyModal(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -241,7 +251,7 @@ function StudioApp() {
       onStashArtifact: stashArtifact,
       isArtifactStashed
     }),
-    [nodes, edges, status?.apiKeyConfigured, activeWorkspace?.stashItems]
+    [nodes, edges, apiKey, activeWorkspace?.stashItems]
   );
 
   const hydratedNodes = useMemo(() => {
@@ -297,6 +307,20 @@ function StudioApp() {
     }
   }
 
+  function saveApiKey() {
+    const trimmed = apiKeyInput.trim();
+    if (!trimmed) return;
+    setApiKey(trimmed);
+    localStorage.setItem(API_KEY_STORAGE_KEY, trimmed);
+    setShowApiKeyModal(false);
+    void loadStatus();
+  }
+
+  function openApiKeyModal() {
+    setApiKeyInput(apiKey);
+    setShowApiKeyModal(true);
+  }
+
   async function loadWorkspaceList(preferredId?: string) {
     const response = await fetch("/api/workspaces");
     if (!response.ok) {
@@ -336,6 +360,7 @@ function StudioApp() {
   async function createSmartWorkspace(formData: FormData) {
     const response = await fetch("/api/workspaces/smart", {
       method: "POST",
+      headers: { "X-API-Key": apiKey },
       body: formData
     });
     const workspace = (await response.json()) as WorkspacePayload & { error?: string };
@@ -484,8 +509,8 @@ function StudioApp() {
       return;
     }
 
-    if (!status?.apiKeyConfigured) {
-      patchNode(nodeId, { error: "API Key 未配置，请先配置 .env 中的 MIMO_API_KEY。" });
+    if (!apiKey) {
+      patchNode(nodeId, { error: "API Key 未配置，请点击顶部 API Key 区域配置。" });
       return;
     }
 
@@ -515,6 +540,7 @@ function StudioApp() {
 
         const response = await fetch("/api/tts/voiceclone", {
           method: "POST",
+          headers: { "X-API-Key": apiKey },
           body: formData
         });
         const payload = (await response.json()) as DebugResponse & { error?: string; details?: unknown };
@@ -552,8 +578,8 @@ function StudioApp() {
       return;
     }
 
-    if (!status?.apiKeyConfigured) {
-      patchNode(nodeId, { error: "API Key 未配置，请先配置 .env 中的 MIMO_API_KEY。" });
+    if (!apiKey) {
+      patchNode(nodeId, { error: "API Key 未配置，请点击顶部 API Key 区域配置。" });
       return;
     }
 
@@ -577,7 +603,7 @@ function StudioApp() {
       for (const [index, item] of textItems.filter((entry) => entry.text.trim()).entries()) {
         const response = await fetch("/api/tts/voicedesign", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "X-API-Key": apiKey },
           body: JSON.stringify({
             voiceDescription,
             text: item.text.trim(),
@@ -619,8 +645,8 @@ function StudioApp() {
       return;
     }
 
-    if (!status?.apiKeyConfigured) {
-      patchNode(nodeId, { error: "API Key 未配置，请先配置 .env 中的 MIMO_API_KEY。" });
+    if (!apiKey) {
+      patchNode(nodeId, { error: "API Key 未配置，请点击顶部 API Key 区域配置。" });
       return;
     }
 
@@ -635,7 +661,7 @@ function StudioApp() {
     try {
       const response = await fetch("/api/voice-style/optimize", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-API-Key": apiKey },
         body: JSON.stringify({ style })
       });
       const payload = (await response.json()) as StyleOptimizeResponse;
@@ -664,8 +690,8 @@ function StudioApp() {
       return;
     }
 
-    if (!status?.apiKeyConfigured) {
-      patchNode(nodeId, { error: "API Key 未配置，请先配置 .env 中的 MIMO_API_KEY。" });
+    if (!apiKey) {
+      patchNode(nodeId, { error: "API Key 未配置，请点击顶部 API Key 区域配置。" });
       return;
     }
 
@@ -680,7 +706,7 @@ function StudioApp() {
     try {
       const response = await fetch("/api/voice-design/optimize", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-API-Key": apiKey },
         body: JSON.stringify({ voiceDescription })
       });
       const payload = (await response.json()) as StyleOptimizeResponse;
@@ -733,7 +759,7 @@ function StudioApp() {
           <h1>铸光音频工作站</h1>
         </div>
         <div className="topbar-actions">
-          <StatusPill status={status} error={statusError} onRefresh={loadStatus} />
+          <StatusPill apiKey={apiKey} onOpenModal={openApiKeyModal} />
           <button type="button" onClick={() => void saveWorkspace()}>
             <Save size={16} />
             {isSaving ? "保存中" : "保存"}
@@ -741,12 +767,59 @@ function StudioApp() {
         </div>
       </header>
 
-      {!status?.apiKeyConfigured ? (
+      {apiKey === DEFAULT_API_KEY ? (
         <section className="api-warning">
           <AlertTriangle size={18} />
-          <span>未检测到 MIMO_API_KEY。请在本地 .env 中配置后重启服务，音频克隆节点才可运行。</span>
+          <span>当前使用的是默认 API Key，不保证长期可用。请点击右上角 API Key 区域配置自己的密钥。</span>
         </section>
       ) : null}
+
+      {showApiKeyModal && (
+        <div className="api-key-modal" onClick={() => setShowApiKeyModal(false)}>
+          <div className="api-key-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="api-key-modal-header">
+              <h3>
+                <Key size={18} />
+                配置 API Key
+              </h3>
+              <button className="api-key-modal-close" type="button" onClick={() => setShowApiKeyModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="api-key-modal-body">
+              <p className="api-key-modal-hint">
+                请输入您的 MiMo API Key。可前往{" "}
+                <a href="https://api.xiaomimimo.com" target="_blank" rel="noopener noreferrer">
+                  api.xiaomimimo.com
+                </a>{" "}
+                获取。
+              </p>
+              <input
+                type="text"
+                className="api-key-input"
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                placeholder="sk-..."
+                spellCheck={false}
+              />
+              {apiKey === DEFAULT_API_KEY && (
+                <p className="api-key-modal-warn">
+                  <AlertTriangle size={14} />
+                  当前使用的默认 Key 不可长期使用，不保证可用性，建议尽快配置自己的密钥。
+                </p>
+              )}
+            </div>
+            <div className="api-key-modal-footer">
+              <button type="button" className="api-key-btn-cancel" onClick={() => setShowApiKeyModal(false)}>
+                取消
+              </button>
+              <button type="button" className="api-key-btn-save" onClick={saveApiKey}>
+                保存
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <section className="studio-layout">
         <aside className="board-sidebar">
@@ -1432,12 +1505,13 @@ function ContextMenu({ menu, onAdd }: { menu: { x: number; y: number }; onAdd: (
   );
 }
 
-function StatusPill({ status, error, onRefresh }: { status: StatusResponse | null; error: string | null; onRefresh: () => void }) {
-  const text = error ? "代理离线" : status?.apiKeyConfigured ? "API Key 已就绪" : "API Key 未配置";
-  const tone = error ? "bad" : status?.apiKeyConfigured ? "good" : "warn";
+function StatusPill({ apiKey, onOpenModal }: { apiKey: string; onOpenModal: () => void }) {
+  const masked = apiKey.length > 8 ? `${apiKey.slice(0, 3)}***${apiKey.slice(-4)}` : "***";
+  const isDefault = apiKey === DEFAULT_API_KEY;
   return (
-    <button className={`status-pill ${tone}`} type="button" onClick={onRefresh}>
-      {text}
+    <button className={`status-pill ${isDefault ? "warn" : "good"}`} type="button" onClick={onOpenModal}>
+      <Key size={14} />
+      <span>API Key: {masked}</span>
     </button>
   );
 }

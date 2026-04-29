@@ -919,3 +919,140 @@ a.stash-round-action:hover {
     transform: translateY(0);
   }
 }
+
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.api-key-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.64);
+  backdrop-filter: blur(6px);
+}
+
+.api-key-modal-content {
+  width: min(480px, calc(100vw - 48px));
+  border: 1px solid rgba(197, 164, 93, 0.42);
+  border-radius: 8px;
+  background: rgba(13, 13, 11, 0.98);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+.api-key-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(197, 164, 93, 0.24);
+}
+
+.api-key-modal-header h3 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #f5ecd4;
+  font-size: 16px;
+}
+
+.api-key-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #a09880;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.api-key-modal-close:hover {
+  background: rgba(197, 164, 93, 0.15);
+  color: #f5ecd4;
+}
+
+.api-key-modal-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.api-key-modal-hint {
+  margin: 0;
+  color: #a09880;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.api-key-modal-hint a {
+  color: #c5a45d;
+  text-decoration: none;
+}
+
+.api-key-modal-hint a:hover {
+  text-decoration: underline;
+}
+
+.api-key-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(197, 164, 93, 0.38);
+  border-radius: 6px;
+  background: rgba(24, 23, 19, 0.92);
+  color: #efe7cf;
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  font-size: 14px;
+  outline: none;
+}
+
+.api-key-input:focus {
+  border-color: rgba(197, 164, 93, 0.72);
+  box-shadow: 0 0 0 2px rgba(197, 164, 93, 0.15);
+}
+
+.api-key-modal-warn {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #ffe0a0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.api-key-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid rgba(197, 164, 93, 0.24);
+}
+
+.api-key-btn-cancel {
+  padding: 8px 16px;
+}
+
+.api-key-btn-save {
+  padding: 8px 16px;
+  background: rgba(197, 164, 93, 0.25);
+  border-color: rgba(197, 164, 93, 0.58);
+  color: #f5ecd4;
+}
+
+.api-key-btn-save:hover {
+  background: rgba(197, 164, 93, 0.4);
+}

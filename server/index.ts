@@ -115,11 +115,20 @@ app.use(cors());
 // 画板会持久化参考音频和生成产物的 data URL，本地工作站需要更高的 JSON 限制。
 app.use(express.json({ limit: "80mb" }));
 
+function getApiKey(req: { headers: Record<string, string | string[] | undefined> }): string | undefined {
+  const headerKey = req.headers["x-api-key"];
+  if (typeof headerKey === "string" && headerKey.trim()) {
+    return headerKey.trim();
+  }
+  return process.env.MIMO_API_KEY;
+}
+
 app.get("/api/status", (_req, res) => {
   res.json({
     ok: true,
     model: "mimo-v2.5-tts-voiceclone",
     apiKeyConfigured: Boolean(process.env.MIMO_API_KEY),
+    hasEnvKey: Boolean(process.env.MIMO_API_KEY),
     maxAudioBytes,
     allowedMimeTypes: Array.from(allowedMimeTypes)
   });
@@ -129,7 +138,7 @@ app.post("/api/voice-style/optimize", async (req: Request<unknown, unknown, Voic
   const startedAt = Date.now();
 
   try {
-    const apiKey = process.env.MIMO_API_KEY;
+    const apiKey = getApiKey(req);
     if (!apiKey) {
       return res.status(500).json({
         error: "MIMO_API_KEY is not configured. Copy .env.example to .env and set your key."
@@ -211,7 +220,7 @@ app.post("/api/voice-design/optimize", async (req: Request<unknown, unknown, Voi
   const startedAt = Date.now();
 
   try {
-    const apiKey = process.env.MIMO_API_KEY;
+    const apiKey = getApiKey(req);
     if (!apiKey) {
       return res.status(500).json({
         error: "MIMO_API_KEY is not configured. Copy .env.example to .env and set your key."
@@ -377,7 +386,7 @@ app.post("/api/workspaces/smart", upload.single("voice"), async (req: Request, r
       return res.status(400).json({ error: "Script must include at least one paragraph. Use ---- to separate paragraphs." });
     }
 
-    const apiKey = process.env.MIMO_API_KEY;
+    const apiKey = getApiKey(req);
     if (!apiKey) {
       return res.status(500).json({
         error: "MIMO_API_KEY is not configured. Copy .env.example to .env and set your key."
@@ -521,7 +530,7 @@ app.post("/api/tts/voicedesign", async (req: Request<unknown, unknown, VoiceDesi
   const startedAt = Date.now();
 
   try {
-    const apiKey = process.env.MIMO_API_KEY;
+    const apiKey = getApiKey(req);
     if (!apiKey) {
       return res.status(500).json({
         error: "MIMO_API_KEY is not configured. Copy .env.example to .env and set your key."
@@ -617,7 +626,7 @@ app.post("/api/tts/voiceclone", upload.single("voice"), async (req: Request, res
   const startedAt = Date.now();
 
   try {
-    const apiKey = process.env.MIMO_API_KEY;
+    const apiKey = getApiKey(req);
     if (!apiKey) {
       return res.status(500).json({
         error: "MIMO_API_KEY is not configured. Copy .env.example to .env and set your key."
