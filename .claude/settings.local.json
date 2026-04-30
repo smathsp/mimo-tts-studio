@@ -4,7 +4,10 @@
       "Bash(npx tsc *)",
       "Bash(npx vite *)",
       "Bash(npm run *)",
-      "Bash(curl -s http://localhost:5173)"
+      "Bash(curl -s http://localhost:5173)",
+      "Bash(git checkout *)",
+      "Bash(git merge *)",
+      "Bash(git stash *)"
     ]
   }
 }
