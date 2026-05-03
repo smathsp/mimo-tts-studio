@@ -186,7 +186,9 @@ const nodeCatalog: Record<
 
 const autoSaveDelayMs = 5000;
 const DEFAULT_API_KEY = "sk-cbpjuoes34akq38omkqz9s08s7h9dxwe7cjshz5824kskliz";
+const DEFAULT_API_ENDPOINT = "https://api.xiaomimimo.com/v1/chat/completions";
 const API_KEY_STORAGE_KEY = "mimo-api-key";
+const API_ENDPOINT_STORAGE_KEY = "mimo-api-endpoint";
 
 const allowedAudioTypes = new Set(["audio/mpeg", "audio/mp3", "audio/mp4", "audio/m4a", "audio/wav", "audio/x-wav", "audio/wave", "video/mp4"]);
 const maxAudioBytes = Math.floor(7.5 * 1024 * 1024);
@@ -213,8 +215,10 @@ function StudioApp() {
   const flowRef = useRef<ReactFlowInstance<StudioNode, StudioEdge> | null>(null);
   const saveTimerRef = useRef<number | null>(null);
   const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem(API_KEY_STORAGE_KEY) || DEFAULT_API_KEY);
+  const [apiEndpoint, setApiEndpoint] = useState<string>(() => localStorage.getItem(API_ENDPOINT_STORAGE_KEY) || DEFAULT_API_ENDPOINT);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState(apiKey);
+  const [apiEndpointInput, setApiEndpointInput] = useState(apiEndpoint);
   const [topbarCollapsed, setTopbarCollapsed] = useState(false);
   const [showDefaultKeyWarning, setShowDefaultKeyWarning] = useState(true);
   const topbarHoverTimerRef = useRef<number | null>(null);
@@ -337,16 +341,25 @@ function StudioApp() {
   }
 
   function saveApiKey() {
-    const trimmed = apiKeyInput.trim();
-    if (!trimmed) return;
-    setApiKey(trimmed);
-    localStorage.setItem(API_KEY_STORAGE_KEY, trimmed);
+    const trimmedKey = apiKeyInput.trim();
+    const trimmedEndpoint = apiEndpointInput.trim();
+    if (!trimmedKey) return;
+    setApiKey(trimmedKey);
+    localStorage.setItem(API_KEY_STORAGE_KEY, trimmedKey);
+    if (trimmedEndpoint) {
+      setApiEndpoint(trimmedEndpoint);
+      localStorage.setItem(API_ENDPOINT_STORAGE_KEY, trimmedEndpoint);
+    } else {
+      setApiEndpoint(DEFAULT_API_ENDPOINT);
+      localStorage.removeItem(API_ENDPOINT_STORAGE_KEY);
+    }
     closeApiKeyModal();
     void loadStatus();
   }
 
   function openApiKeyModal() {
     setApiKeyInput(apiKey);
+    setApiEndpointInput(apiEndpoint);
     setShowApiKeyModal(true);
   }
 
@@ -394,7 +407,7 @@ function StudioApp() {
   async function createSmartWorkspace(formData: FormData) {
     const response = await fetch("/api/workspaces/smart", {
       method: "POST",
-      headers: { "X-API-Key": apiKey },
+      headers: { "X-API-Key": apiKey, "X-API-Endpoint": apiEndpoint },
       body: formData
     });
     const workspace = (await response.json()) as WorkspacePayload & { error?: string };
@@ -574,7 +587,7 @@ function StudioApp() {
 
         const response = await fetch("/api/tts/voiceclone", {
           method: "POST",
-          headers: { "X-API-Key": apiKey },
+          headers: { "X-API-Key": apiKey, "X-API-Endpoint": apiEndpoint },
           body: formData
         });
         const payload = (await response.json()) as DebugResponse & { error?: string; details?: unknown };
@@ -637,7 +650,7 @@ function StudioApp() {
       for (const [index, item] of textItems.filter((entry) => entry.text.trim()).entries()) {
         const response = await fetch("/api/tts/voicedesign", {
           method: "POST",
-          headers: { "Content-Type": "application/json", "X-API-Key": apiKey },
+          headers: { "Content-Type": "application/json", "X-API-Key": apiKey, "X-API-Endpoint": apiEndpoint },
           body: JSON.stringify({
             voiceDescription,
             text: item.text.trim(),
@@ -695,7 +708,7 @@ function StudioApp() {
     try {
       const response = await fetch("/api/voice-style/optimize", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-API-Key": apiKey },
+        headers: { "Content-Type": "application/json", "X-API-Key": apiKey, "X-API-Endpoint": apiEndpoint },
         body: JSON.stringify({ style })
       });
       const payload = (await response.json()) as StyleOptimizeResponse;
@@ -740,7 +753,7 @@ function StudioApp() {
     try {
       const response = await fetch("/api/voice-design/optimize", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-API-Key": apiKey },
+        headers: { "Content-Type": "application/json", "X-API-Key": apiKey, "X-API-Endpoint": apiEndpoint },
         body: JSON.stringify({ voiceDescription })
       });
       const payload = (await response.json()) as StyleOptimizeResponse;
@@ -838,8 +851,8 @@ function StudioApp() {
             <div className="api-key-modal-body">
               <p className="api-key-modal-hint">
                 请输入您的 MiMo API Key。可前往{" "}
-                <a href="https://api.xiaomimimo.com" target="_blank" rel="noopener noreferrer">
-                  api.xiaomimimo.com
+                <a href="https://platform.xiaomimimo.com/" target="_blank" rel="noopener noreferrer">
+                  platform.xiaomimimo.com
                 </a>{" "}
                 获取。
               </p>
@@ -857,6 +870,25 @@ function StudioApp() {
                   当前使用的默认 Key 不可长期使用，不保证可用性，建议尽快配置自己的密钥。
                 </p>
               )}
+              <div className="api-endpoint-section">
+                <p className="api-key-modal-hint">
+                  API 地址（可选，留空使用默认地址）：
+                </p>
+                <input
+                  type="text"
+                  className="api-key-input"
+                  value={apiEndpointInput}
+                  onChange={(e) => setApiEndpointInput(e.target.value)}
+                  placeholder="https://api.xiaomimimo.com/v1/chat/completions"
+                  spellCheck={false}
+                />
+                <p className="api-endpoint-hint">
+                  token 套餐计划可使用：https://token-plan-cn.xiaomimimo.com/v1/chat/completions
+                </p>
+                <p className="api-endpoint-hint">
+                  非套餐请保持默认
+                </p>
+              </div>
             </div>
             <div className="api-key-modal-footer">
               <button type="button" className="api-key-btn-cancel" onClick={closeApiKeyModal}>
@@ -1219,7 +1251,7 @@ function BoardCreateDialog({
             {voicePreviewUrl ? <StudioAudioPlayer src={voicePreviewUrl} /> : null}
             <label className="node-field">
               <span>场景描述</span>
-              <textarea value={sceneDescription} onChange={(event) => setSceneDescription(event.target.value)} rows={4} />
+              <textarea value={sceneDescription} onChange={(event) => setSceneDescription(event.target.value)} rows={4} placeholder="用简单的关键词去描述这段文本的语境语气并补充必要的信息，帮助模型理解需求" />
             </label>
             <label className="node-field">
               <span>完整台词文稿</span>
@@ -1227,7 +1259,7 @@ function BoardCreateDialog({
                 value={script}
                 onChange={(event) => setScript(event.target.value)}
                 rows={8}
-                placeholder="每段独立段落使用 ---- 分割"
+                placeholder="这里输入需要模型朗读的内容，段落使用 ---- 分割，每段建议小于100字"
               />
             </label>
             {error ? <p className="node-error">{error}</p> : null}

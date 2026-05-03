@@ -1139,6 +1139,19 @@ a.stash-round-action:hover {
   background: rgba(197, 164, 93, 0.4);
 }
 
+.api-endpoint-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(197, 164, 93, 0.18);
+}
+
+.api-endpoint-hint {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: #7a7360;
+  word-break: break-all;
+}
+
 .smart-progress {
   margin: 12px 0 4px;
 }
