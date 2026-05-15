@@ -91,6 +91,7 @@ type AudiobookCharacter = {
   voiceTraits: string;
   personality: string;
   voiceDescription: string;
+  voiceSampleText?: string;
   voiceDataUrl: string | null;
   voiceStatus: "pending" | "generating" | "ready" | "error";
   voiceError?: string;
@@ -2034,6 +2035,7 @@ function AudiobookConsole({
                   {char.age && <span className="char-tag">{char.age}</span>}
                   <p className="char-personality">{char.personality}</p>
                   <p className="char-voice-desc">{char.voiceDescription}</p>
+                  {char.voiceSampleText && <p className="char-voice-sample">试听：{char.voiceSampleText}</p>}
                 </div>
                 <div className="character-voice">
                   {char.voiceStatus === "ready" && char.voiceDataUrl ? (

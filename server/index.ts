@@ -118,6 +118,7 @@ type AudiobookCharacter = {
   voiceTraits: string;
   personality: string;
   voiceDescription: string;
+  voiceSampleText?: string;
   voiceDataUrl: string | null;
   voiceStatus: "pending" | "generating" | "ready" | "error";
   voiceError?: string;
@@ -794,6 +795,7 @@ ${workspace.novelText}
         voiceTraits: hint?.voiceTraits || "",
         personality: c.personality,
         voiceDescription: c.voiceDescription,
+        voiceSampleText: undefined,
         voiceDataUrl: null,
         voiceStatus: "pending" as const
       };
@@ -852,7 +854,7 @@ app.post("/api/audiobook/:id/characters/:charId/voice", async (req, res, next) =
       });
     }
 
-    const testText = `大家好，我是${character.name}。很高兴认识你。`;
+    const testText = await generateAudiobookCharacterVoiceSampleText(workspace, character, apiKey, apiEndpoint);
     const payload: MimoVoiceDesignPayload = {
       model: "mimo-v2.5-tts-voicedesign",
       messages: [
@@ -890,6 +892,7 @@ app.post("/api/audiobook/:id/characters/:charId/voice", async (req, res, next) =
 
     const updatedCharacter = await updateAudiobookCharacter(req.params.id, req.params.charId, (target) => {
       target.voiceDataUrl = `data:audio/wav;base64,${audioData}`;
+      target.voiceSampleText = testText;
       target.voiceStatus = "ready";
       target.voiceError = undefined;
     });
@@ -1525,6 +1528,142 @@ async function optimizeAudiobookCharacterVoiceDescription(
   }
 
   return content.replace(/```(?:text|markdown)?\s*/gi, "").replace(/```\s*/g, "").trim();
+}
+
+async function generateAudiobookCharacterVoiceSampleText(
+  workspace: StoredAudiobookWorkspace,
+  character: AudiobookCharacter,
+  apiKey: string,
+  apiEndpoint: string
+): Promise<string> {
+  const context = getCharacterNovelContext(workspace.novelText, character.name);
+  const fallbackText = buildFallbackVoiceSampleText(workspace, character);
+  const payload: MimoChatPayload = {
+    model: "mimo-v2.5-pro",
+    messages: [
+      {
+        role: "system",
+        content: [
+          "你是专业的有声书试听台词编剧。",
+          "任务：为某个角色生成一段用于 TTS 音色试听的中文台词。",
+          "",
+          "要求：",
+          "1. 台词必须贴合小说情节、角色身份、性格和声音气质。",
+          "2. 优先改写或提炼原文中该角色可能会说的话；如果原文没有直接台词，可根据上下文生成一句自然的角色台词。",
+          "3. 只输出角色会说出口的内容，不要写角色名、旁白、括号、舞台说明或引号。",
+          "4. 控制在20到50个汉字，适合试听音色，不要过长。",
+          "5. 不要使用固定寒暄句，例如“大家好，我是……很高兴认识你”。",
+          "",
+          "只输出严格JSON，不要Markdown，不要解释。",
+          "JSON结构：{\"text\":\"string\"}"
+        ].join("\n")
+      },
+      {
+        role: "user",
+        content: [
+          `角色名：${character.name}`,
+          `性别：${character.gender || "未知"}`,
+          `年龄：${character.age || "未知"}`,
+          `人物特点：${character.personality || "未提供"}`,
+          `音色描述：${character.voiceDescription || "未提供"}`,
+          `用户音色备注：${character.voiceTraits || "未提供"}`,
+          "",
+          "小说中与该角色相关的上下文：",
+          context || workspace.novelText.slice(0, 3000),
+          "",
+          `兜底参考句：${fallbackText}`,
+          "",
+          "请生成该角色的试听台词。"
+        ].join("\n")
+      }
+    ],
+    temperature: 0.55,
+    top_p: 0.9,
+    thinking: { type: "disabled" }
+  };
+
+  try {
+    const { response: upstreamResponse, text: responseText } = await fetchTextWithTimeout(apiEndpoint, {
+      method: "POST",
+      headers: { "api-key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }, 45000);
+    if (!upstreamResponse.ok) {
+      return fallbackText;
+    }
+
+    const content = extractMessageContent(parseJson(responseText));
+    const parsedText = parseVoiceSampleText(content || "");
+    return parsedText || fallbackText;
+  } catch {
+    return fallbackText;
+  }
+}
+
+function getCharacterNovelContext(novelText: string, characterName: string): string {
+  const paragraphs = novelText
+    .split(/\n{1,}|\r{1,}/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const matched: string[] = [];
+  for (let index = 0; index < paragraphs.length; index++) {
+    if (!paragraphs[index].includes(characterName)) {
+      continue;
+    }
+
+    const start = Math.max(0, index - 1);
+    const end = Math.min(paragraphs.length, index + 2);
+    for (let cursor = start; cursor < end; cursor++) {
+      if (!matched.includes(paragraphs[cursor])) {
+        matched.push(paragraphs[cursor]);
+      }
+    }
+    if (matched.join("\n").length > 2600) {
+      break;
+    }
+  }
+  return matched.join("\n").slice(0, 3200);
+}
+
+function parseVoiceSampleText(content: string): string {
+  const cleaned = content.replace(/```json?\s*/gi, "").replace(/```\s*/g, "").trim();
+  const parsed = parseJson(cleaned) ?? parseJson(cleaned.match(/\{[\s\S]*\}/)?.[0] || "");
+  const rawText = typeof (parsed as { text?: unknown } | null)?.text === "string"
+    ? String((parsed as { text: string }).text)
+    : cleaned;
+  return sanitizeVoiceSampleText(rawText);
+}
+
+function buildFallbackVoiceSampleText(workspace: StoredAudiobookWorkspace, character: AudiobookCharacter): string {
+  const context = getCharacterNovelContext(workspace.novelText, character.name);
+  const quoted = context.match(/[“"「『]([^”"」』]{8,60})[”"」』]/)?.[1];
+  if (quoted) {
+    return sanitizeVoiceSampleText(quoted) || quoted.slice(0, 50);
+  }
+
+  const trait = character.personality || character.voiceTraits || character.voiceDescription || "保持镇定";
+  if (/紧张|不安|害怕|恐惧|慌/.test(trait)) {
+    return "先别慌，告诉我这里到底发生了什么。";
+  }
+  if (/冷静|沉稳|镇定|理性/.test(trait)) {
+    return "现在不是犹豫的时候，我们一步一步来。";
+  }
+  if (/温柔|善良|柔和|慈祥/.test(trait)) {
+    return "别怕，我会陪着你把这件事弄明白。";
+  }
+  if (/强势|威严|严厉|果断/.test(trait)) {
+    return "照我说的做，剩下的事情我来承担。";
+  }
+  return `${character.name}看着眼前的一切，低声说道，我知道该怎么做。`;
+}
+
+function sanitizeVoiceSampleText(value: string): string {
+  return value
+    .replace(/^[\s"'“”‘’「」『』（）()[\]【】]+|[\s"'“”‘’「」『』（）()[\]【】]+$/g, "")
+    .replace(/^(台词|试听台词|text)\s*[:：]\s*/i, "")
+    .replace(/\s+/g, "")
+    .slice(0, 80)
+    .trim();
 }
 
 function getChoiceCount(value: unknown): number {

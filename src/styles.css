@@ -1356,6 +1356,13 @@ a.stash-round-action:hover {
   line-height: 1.4;
 }
 
+.char-voice-sample {
+  margin: 6px 0 0;
+  color: #c5a45d;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .character-voice {
   display: flex;
   align-items: center;
