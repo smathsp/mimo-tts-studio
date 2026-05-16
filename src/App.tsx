@@ -59,6 +59,12 @@ type StatusResponse = {
   allowedMimeTypes: string[];
 };
 
+type ApiSettingsResponse = {
+  apiKey: string;
+  apiEndpoint: string;
+  configured: boolean;
+};
+
 type WorkspaceSummary = {
   id: string;
   name: string;
@@ -337,10 +343,8 @@ function StudioApp() {
 
   useEffect(() => {
     void loadStatus();
+    void loadApiSettings();
     void loadWorkspaceList();
-    if (!localStorage.getItem(API_KEY_STORAGE_KEY)) {
-      setShowApiKeyModal(true);
-    }
 
     const collapseTimer = window.setTimeout(() => {
       setTopbarCollapsed(true);
@@ -452,6 +456,40 @@ function StudioApp() {
     }
   }
 
+  async function loadApiSettings() {
+    try {
+      const response = await fetch("/api/settings");
+      if (!response.ok) {
+        throw new Error(`API 配置加载失败：HTTP ${response.status}`);
+      }
+
+      const settings = (await response.json()) as ApiSettingsResponse;
+      const localKey = localStorage.getItem(API_KEY_STORAGE_KEY) || "";
+      const localEndpoint = localStorage.getItem(API_ENDPOINT_STORAGE_KEY) || "";
+      const nextKey = settings.apiKey || localKey || DEFAULT_API_KEY;
+      const nextEndpoint = settings.apiEndpoint || localEndpoint || DEFAULT_API_ENDPOINT;
+
+      setApiKey(nextKey);
+      setApiEndpoint(nextEndpoint);
+      setApiKeyInput(nextKey);
+      setApiEndpointInput(nextEndpoint);
+
+      if (!settings.configured && localKey) {
+        void persistApiSettings(localKey, localEndpoint || nextEndpoint);
+        return;
+      }
+
+      if (!settings.configured && !localKey) {
+        setShowApiKeyModal(true);
+      }
+    } catch (error) {
+      console.warn("[settings] failed to load API settings", error);
+      if (!localStorage.getItem(API_KEY_STORAGE_KEY)) {
+        setShowApiKeyModal(true);
+      }
+    }
+  }
+
   function saveApiKey() {
     const trimmedKey = apiKeyInput.trim();
     const trimmedEndpoint = apiEndpointInput.trim();
@@ -465,8 +503,21 @@ function StudioApp() {
       setApiEndpoint(DEFAULT_API_ENDPOINT);
       localStorage.removeItem(API_ENDPOINT_STORAGE_KEY);
     }
+    void persistApiSettings(trimmedKey, trimmedEndpoint || DEFAULT_API_ENDPOINT);
     closeApiKeyModal();
     void loadStatus();
+  }
+
+  async function persistApiSettings(apiKey: string, apiEndpoint: string) {
+    try {
+      await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey, apiEndpoint })
+      });
+    } catch (error) {
+      console.warn("[settings] failed to persist API settings", error);
+    }
   }
 
   function openApiKeyModal() {

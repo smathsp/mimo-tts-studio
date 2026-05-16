@@ -25,6 +25,7 @@ const mimoEndpoint = "https://api.xiaomimimo.com/v1/chat/completions";
 const dataDir = path.resolve(process.env.MIMO_DATA_DIR || path.join(process.cwd(), "data"));
 const workspacesDir = path.join(dataDir, "workspaces");
 const workspaceFilePath = path.join(dataDir, "workspaces.json");
+const settingsFilePath = path.join(dataDir, "settings.json");
 const audiobookProductTimeoutMs = 60000;
 let workspaceWriteQueue: Promise<void> = Promise.resolve();
 let workspaceWriteSequence = 0;
@@ -106,6 +107,11 @@ type SmartWorkspaceSegment = {
   index: number;
   title: string;
   directorText: string;
+};
+
+type ApiSettings = {
+  apiKey?: string;
+  apiEndpoint?: string;
 };
 
 // ====== 有声书专用类型 ======
@@ -240,6 +246,44 @@ app.get("/api/status", (_req, res) => {
     maxAudioBytes,
     allowedMimeTypes: Array.from(allowedMimeTypes)
   });
+});
+
+app.get("/api/settings", async (_req, res, next) => {
+  try {
+    const settings = await readApiSettings();
+    res.json({
+      apiKey: settings.apiKey ?? process.env.MIMO_API_KEY ?? "",
+      apiEndpoint: settings.apiEndpoint ?? mimoEndpoint,
+      configured: Boolean(settings.apiKey || process.env.MIMO_API_KEY)
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/settings", async (req: Request<unknown, unknown, ApiSettings>, res, next) => {
+  try {
+    const apiKey = typeof req.body.apiKey === "string" ? req.body.apiKey.trim() : "";
+    const apiEndpoint = typeof req.body.apiEndpoint === "string" ? req.body.apiEndpoint.trim() : "";
+
+    if (!apiKey) {
+      return res.status(400).json({ error: "API Key is required." });
+    }
+
+    const settings: ApiSettings = {
+      apiKey,
+      apiEndpoint: apiEndpoint || mimoEndpoint
+    };
+
+    await writeApiSettings(settings);
+    res.json({
+      apiKey: settings.apiKey,
+      apiEndpoint: settings.apiEndpoint,
+      configured: true
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.post("/api/voice-style/optimize", async (req: Request<unknown, unknown, VoiceStyleOptimizePayload>, res, next) => {
@@ -2477,6 +2521,39 @@ async function writeJsonFile(filePath: string, data: unknown): Promise<void> {
     await rm(tempPath, { force: true }).catch(() => undefined);
     throw error;
   }
+}
+
+async function readApiSettings(): Promise<ApiSettings> {
+  try {
+    const raw = await readFile(settingsFilePath, "utf-8");
+    return normalizeApiSettings(JSON.parse(raw));
+  } catch (error) {
+    const code = typeof error === "object" && error && "code" in error ? (error as { code?: string }).code : "";
+    if (code === "ENOENT") {
+      return {};
+    }
+    throw error;
+  }
+}
+
+async function writeApiSettings(settings: ApiSettings): Promise<void> {
+  await mkdir(dataDir, { recursive: true });
+  await writeJsonFile(settingsFilePath, normalizeApiSettings(settings));
+}
+
+function normalizeApiSettings(value: unknown): ApiSettings {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  const candidate = value as ApiSettings;
+  const apiKey = typeof candidate.apiKey === "string" ? candidate.apiKey.trim() : "";
+  const apiEndpoint = typeof candidate.apiEndpoint === "string" ? candidate.apiEndpoint.trim() : "";
+
+  return {
+    ...(apiKey ? { apiKey } : {}),
+    ...(apiEndpoint ? { apiEndpoint } : {})
+  };
 }
 
 async function updateWorkspace(workspaceId: string, update: (workspace: StoredWorkspace) => StoredWorkspace): Promise<StoredWorkspace> {
