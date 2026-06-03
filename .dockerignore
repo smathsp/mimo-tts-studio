@@ -1,0 +1,13 @@
+node_modules
+dist
+build
+release
+.git
+.env
+data
+electron
+*.md
+tsconfig*.json
+vite.config.ts
+.vscode
+.idea

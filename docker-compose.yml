@@ -1,0 +1,10 @@
+services:
+  mimo-tts-studio:
+    image: ghcr.io/${GITHUB_REPOSITORY:-smathsp/mimo-tts-studio}:main
+    ports:
+      - "3001:3001"
+    environment:
+      - MIMO_API_KEY=${MIMO_API_KEY}
+      - PORT=3001
+    volumes:
+      - ./data:/app/data
